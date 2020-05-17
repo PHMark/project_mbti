@@ -1,0 +1,11 @@
+venv/
+output/
+__pycache__/
+.scrapy
+*.exe
+*.log
+*.csv
+*.json
+
+
+# git ls-files --others --exclude-standard

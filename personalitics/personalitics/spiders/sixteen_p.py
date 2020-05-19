@@ -4,7 +4,8 @@ import time
 import datetime
 import socket
 from personalitics.items import PersonaliticsItem
-from personalitics.spiders.utils import Xpath
+from personalitics.utils import get_topic
+from personalitics.utils.xpath_lookup import SixteenpXpath
 
 import scrapy
 from scrapy.linkextractors import LinkExtractor
@@ -21,13 +22,13 @@ from tqdm import tqdm
 import numpy as np
 
 
-class SixteenPSpider(CrawlSpider, Xpath):
+class SixteenPSpider(CrawlSpider, SixteenpXpath):
     name = 'sixteen_p'
-    xpath_rules = Xpath.XPATHS['rules']
-    xpath_comment_section = Xpath.XPATHS['comment_section']
+    xpath_rules = SixteenpXpath.XPATHS['rules']
+    xpath_comment_section = SixteenpXpath.XPATHS['comment_section']
 
     def __init__(self, *args, **kwargs):
-        self.driver = webdriver.Chrome(executable_path='chromedriver.exe')
+        self.driver = webdriver.Chrome(executable_path='selenium_misc/chromedriver.exe')
         self.allowed_domains = ['16personalities.com']
         self.start_urls = ['https://www.16personalities.com/personality-types']
         
@@ -50,9 +51,11 @@ class SixteenPSpider(CrawlSpider, Xpath):
             loader = ItemLoader(item=PersonaliticsItem())
 
             # Main fields
+            loader.add_value('topic', get_topic(element.xpath(self.xpath_comment_section['topic']).extract_first()))
             loader.add_value('user_id', element.xpath(self.xpath_comment_section['user_id']).extract_first())
             loader.add_value('user_type', element.xpath(self.xpath_comment_section['user_type']).extract_first())
-            loader.add_value('child_text', element.xpath(self.xpath_comment_section['text']).extract_first())
+            loader.add_value('parent_text', element.xpath(self.xpath_comment_section['parent_text']).extract_first())
+            loader.add_value('child_text', element.xpath(self.xpath_comment_section['child_text']).extract_first())
             loader.add_value('date', element.xpath(self.xpath_comment_section['date']).extract_first())
 
             # House keeping fields
@@ -61,7 +64,7 @@ class SixteenPSpider(CrawlSpider, Xpath):
             loader.add_value('spider', self.name)
             loader.add_value('server', socket.gethostname())
             loader.add_value('created_at', datetime.datetime.now())
-
+            print(loader.load_item())
             yield loader.load_item()
 
     def process_response(self, url):

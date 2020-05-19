@@ -22,6 +22,12 @@ LOG_LEVEL = 'INFO'
 # JOB DIRECTORY
 # JOBDIR = crawls/personality_cafe
 
+# Proxy rotation
+RETRY_TIMES = 10
+RETRY_HTTP_CODES = [500, 503, 504, 400, 403, 404, 408]
+PROXY_MODE = 0
+PROXY_LIST = 'bypass_misc/proxy_list.txt'
+
 # Download Config
 DOWNLOAD_HANDLERS = {'s3': None,}
 HTTPCACHE_ENABLED=True
@@ -35,9 +41,14 @@ ITEM_PIPELINES = {
 }
 
 # Middleware Config
-# DOWNLOADER_MIDDLEWARES = {
-#     'personalitics.middlewares.selenium.SeleniumMiddleware': 200
-# }
+DOWNLOADER_MIDDLEWARES = {
+	'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
+	'personalitics.middlewares.user_agent.UserAgentRotatorMiddleware': 400,
+    'scrapy.downloadermiddlewares.retry.RetryMiddleware': 90,
+    'scrapy_proxies.RandomProxy': 100,
+    'scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware': 110,
+    # 'scrapy_cloudflare_middleware.middlewares.CloudFlareMiddleware': 560,
+}
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'personalitics (+http://www.yourdomain.com)'
@@ -94,7 +105,7 @@ ROBOTSTXT_OBEY = False
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
-#AUTOTHROTTLE_ENABLED = True
+AUTOTHROTTLE_ENABLED = True
 # The initial download delay
 #AUTOTHROTTLE_START_DELAY = 5
 # The maximum download delay to be set in case of high latencies

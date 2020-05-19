@@ -1,0 +1,1 @@
+This folder contains proxy_list.txt and user_agent_list.txt, please download those files.

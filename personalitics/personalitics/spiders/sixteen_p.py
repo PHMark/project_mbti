@@ -52,7 +52,7 @@ class SixteenPSpider(CrawlSpider, Xpath):
             # Main fields
             loader.add_value('user_id', element.xpath(self.xpath_comment_section['user_id']).extract_first())
             loader.add_value('user_type', element.xpath(self.xpath_comment_section['user_type']).extract_first())
-            loader.add_value('text', element.xpath(self.xpath_comment_section['text']).extract_first())
+            loader.add_value('child_text', element.xpath(self.xpath_comment_section['text']).extract_first())
             loader.add_value('date', element.xpath(self.xpath_comment_section['date']).extract_first())
 
             # House keeping fields

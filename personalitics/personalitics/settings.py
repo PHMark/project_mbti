@@ -9,19 +9,32 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+# 
 BOT_NAME = 'personalitics'
-
 SPIDER_MODULES = ['personalitics.spiders']
 NEWSPIDER_MODULE = 'personalitics.spiders'
-LOG_LEVEL = 'INFO'  # to only display errors
+
+# Log Config
+LOG_LEVEL = 'INFO' 
+# LOG_FORMAT = '%(levelname)s: %(message)s'
+# LOG_FILE = 'log.txt'
+
+# JOB DIRECTORY
+# JOBDIR = crawls/personality_cafe
+
+# Download Config
 DOWNLOAD_HANDLERS = {'s3': None,}
 HTTPCACHE_ENABLED=True
 CLOSESPIDER_ITEMCOUNT=0
 DOWNLOAD_DELAY=1.0
 RANDOMIZE_DOWNLOAD_DELAY=True
 
-# LOG_FORMAT = '%(levelname)s: %(message)s'
-# LOG_FILE = 'log.txt'
+# Pipeline Config
+ITEM_PIPELINES = {
+   'personalitics.pipelines.PersonaliticsPipeline': 300,
+}
+
+# Middleware Config
 # DOWNLOADER_MIDDLEWARES = {
 #     'personalitics.middlewares.selenium.SeleniumMiddleware': 200
 # }

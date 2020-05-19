@@ -7,9 +7,11 @@ from scrapy.loader.processors import TakeFirst, MapCompose
 
 class PersonaliticsItem(scrapy.Item):
 	# Main fields
+	topic = Field()
 	user_id = Field(output_processor=MapCompose(lambda x: x.strip('/profiles/').strip()))
 	user_type = Field(output_processor=MapCompose(lambda x: x.strip()))
-	text = Field(output_processor=MapCompose(lambda x: x.strip()))
+	parent_text = Field(output_processor=MapCompose(lambda x: x.strip())) 
+	child_text = Field(output_processor=MapCompose(lambda x: x.strip()))
 	date = Field()
 
 	# Housekeeping fields

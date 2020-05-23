@@ -13,39 +13,33 @@ from scrapy.spiders import CrawlSpider, Rule
 from scrapy.loader import ItemLoader
 from scrapy.loader.processors import MapCompose, TakeFirst
 from scrapy.http import HtmlResponse
+from scrapy_splash import SplashTextResponse
 from scrapy.utils.python import to_bytes
 from scrapy.signalmanager import SignalManager
 from scrapy import signals
+from scrapy_splash import SplashRequest, SplashJsonResponse
 
 from selenium import webdriver
 from tqdm import tqdm
 import numpy as np
 
 
-class SixteenPSpider(CrawlSpider, SixteenpXpath):
+class SixteenPSpider(CrawlSpider, SixteenpXpath, scrapy.spiders.crawl):
     name = 'sixteen_p'
     xpath_rules = SixteenpXpath.XPATHS['rules']
     xpath_comment_section = SixteenpXpath.XPATHS['comment_section']
-
-    def __init__(self, *args, **kwargs):
-        self.driver = webdriver.Chrome(executable_path='selenium_misc/chromedriver.exe')
-        self.allowed_domains = ['16personalities.com']
-        self.start_urls = ['https://www.16personalities.com/personality-types']
-        
-        self.rules = [
-            Rule(LinkExtractor(restrict_xpaths=self.xpath_rules['types']), follow=True),
-            Rule(LinkExtractor(restrict_xpaths=self.xpath_rules['type_explorer']), callback='parse_comment', follow=True),
-            Rule(LinkExtractor(restrict_xpaths=self.xpath_rules['next_comment_section']), callback='parse_comment', follow=True),
+    allowed_domains = ['16personalities.com']
+    start_urls = ['https://www.16personalities.com/personality-types']
+    rules = [
+            Rule(LinkExtractor(restrict_xpaths=xpath_rules['types']), follow=True, ),
+            Rule(LinkExtractor(restrict_xpaths=xpath_rules['type_explorer']), callback='parse_comment', process_request='use_splash', follow=True),
+            Rule(LinkExtractor(restrict_xpaths=xpath_rules['next_comment_section']), callback='parse_comment', process_request='use_splash', follow=True)
         ]
-
-        super(SixteenPSpider, self).__init__(*args, **kwargs)
 
     def parse_comment(self, response):
         self.pbar.update()
-
-        response = self.process_response(response.url)
         user_comments = response.xpath(self.xpath_comment_section['user_comments'])
-
+        print(user_comments)
         # Loop over the comment list
         for element in user_comments:
             loader = ItemLoader(item=PersonaliticsItem())
@@ -64,43 +58,34 @@ class SixteenPSpider(CrawlSpider, SixteenpXpath):
             loader.add_value('spider', self.name)
             loader.add_value('server', socket.gethostname())
             loader.add_value('created_at', datetime.datetime.now())
-            print(loader.load_item())
+            print( loader.load_item())
             yield loader.load_item()
 
-    def process_response(self, url):
-        ''' 
-            Modify the response of a URL to render the needed elements from the
-            `Other Comment` tab.
-            
-            Parameters
-            ----------
-            url : str
-                  The URL of response that we will modify
-            
-            Returns
-            -------
-            resp : HtmlResponse
-                   The modified response of URL
-        '''
-
-        self.driver.get(url)
-        clicked_other = False
-
-        # Click the `Other` tab in the comment section
-        while not clicked_other:
-            try:
-                other_tab = self.driver.find_element_by_xpath('//div[(text()[contains(.,"Other Comments")]) and (@class="title")]')
-                other_tab.click()
-                clicked_other = True
-            except:
-                print('Failed clicking, retrying to click the `Other` tab button....')
-                time.sleep(np.random.uniform(1.3, 2.5))
-                self.driver.get(self.driver.current_url)
-                clicked_other = False
-
-        body = to_bytes(self.driver.page_source)
-        resp = HtmlResponse(self.driver.current_url, body=body, encoding='utf-8')
-        return resp
+    # Source https://github.com/scrapy-plugins/scrapy-splash/issues/92
+    def _requests_to_follow(self, response):
+        if not isinstance(
+                response,
+                (HtmlResponse, SplashJsonResponse, SplashTextResponse)):
+            return
+        seen = set()
+        for n, rule in enumerate(self._rules):
+            links = [lnk for lnk in rule.link_extractor.extract_links(response)
+                     if lnk not in seen]
+            if links and rule.process_links:
+                links = rule.process_links(links)
+            for link in links:
+                seen.add(link)
+                r = self._build_request(n, link)
+                yield rule.process_request(r)
+    
+    def use_splash(self, request):
+        request.meta.update(splash={
+            'args': {
+                'wait': 1,
+            },
+            'endpoint': 'render.html',
+        })
+        return request
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -115,9 +100,6 @@ class SixteenPSpider(CrawlSpider, SixteenpXpath):
         self.pbar.write('Opening {} spider'.format(spider.name))
 
     def spider_closed(self, spider):
-        if self.driver:
-            self.driver.quit()
-            self.driver = None
         self.pbar.clear()
         self.pbar.write('Closing {} spider'.format(spider.name))
         self.pbar.close()

@@ -5,6 +5,7 @@ crawls/
 .ipynb_checkpoints/
 .scrapy
 *.exe
+*.jpg
 *.log
 *.txt
 *.csv

@@ -1,45 +1,99 @@
 # -*- coding: utf-8 -*-
 
 import time
+import json
 import datetime
 import socket
+from urllib.parse import urljoin
 from personalitics.items import PersonaliticsItem
 from personalitics.utils import get_topic
 from personalitics.utils.xpath_lookup import SixteenpXpath
-
+from personalitics.utils.lua_lookup import lua_dict
 import scrapy
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.loader import ItemLoader
 from scrapy.loader.processors import MapCompose, TakeFirst
 from scrapy.http import HtmlResponse
-from scrapy_splash import SplashTextResponse
+from scrapy.http import FormRequest, Request
 from scrapy.utils.python import to_bytes
 from scrapy.signalmanager import SignalManager
 from scrapy import signals
 from scrapy_splash import SplashRequest, SplashJsonResponse
+from scrapy_splash import SplashTextResponse
 
 from selenium import webdriver
 from tqdm import tqdm
 import numpy as np
 
 
-class SixteenPSpider(CrawlSpider, SixteenpXpath, scrapy.spiders.crawl):
+class SixteenPSpider(CrawlSpider, SixteenpXpath):
     name = 'sixteen_p'
-    xpath_rules = SixteenpXpath.XPATHS['rules']
-    xpath_comment_section = SixteenpXpath.XPATHS['comment_section']
     allowed_domains = ['16personalities.com']
     start_urls = ['https://www.16personalities.com/personality-types']
-    rules = [
-            Rule(LinkExtractor(restrict_xpaths=xpath_rules['types']), follow=True, ),
-            Rule(LinkExtractor(restrict_xpaths=xpath_rules['type_explorer']), callback='parse_comment', process_request='use_splash', follow=True),
-            Rule(LinkExtractor(restrict_xpaths=xpath_rules['next_comment_section']), callback='parse_comment', process_request='use_splash', follow=True)
-        ]
+
+    xpath_rules = SixteenpXpath.XPATHS['rules']
+    xpath_comment_section = SixteenpXpath.XPATHS['comment_section']
+    render_js = lua_dict['render_js']
+
+    def start_requests(self):
+        lua_script = lua_dict['login']
+
+        yield SplashRequest(
+                url='https://www.16personalities.com/personality-types',
+                endpoint='execute',
+                cache_args=['lua_source'],
+                session_id="foo",
+                callback=self.parse_types,
+                args= {'wait': 0.5, 'lua_source': lua_script}
+            )
+
+    # rules = [
+    #         Rule(LinkExtractor(restrict_xpaths=xpath_rules['types']), follow=True, ),
+    #         Rule(LinkExtractor(restrict_xpaths=xpath_rules['type_explorer']), callback='parse_comment', process_request='use_splash', follow=True),
+    #         Rule(LinkExtractor(restrict_xpaths=xpath_rules['next_comment_section']), callback='parse_comment', process_request='use_splash', follow=True)
+    #     ]
+
+    def parse_types(self, response):
+        # print(response.xpath('//div[@class="info"]//div[@class="name"]//text()').extract_first().strip())
+
+        # Parse Type List
+        type_selector = response.xpath(self.xpath_rules['types'] + '/@href')
+        for url in type_selector.extract():
+            yield SplashRequest(urljoin('https://www.16personalities.com/', url),
+                                endpoint='execute',
+                                session_id="foo",
+                                args={'lua_source': self.render_js},
+                                callback=self.parse_explorer)
+
+    def parse_explorer(self, response):
+        # print(response.xpath('//div[@class="info"]//div[@class="name"]//text()').extract_first().strip())
+
+        # Parse Explorer List
+        explore_selector = response.xpath(self.xpath_rules['type_explorer'] + '/@href')
+        for url in explore_selector.extract():
+            yield SplashRequest(urljoin('https://www.16personalities.com/', url),
+                                endpoint='execute',
+                                session_id="foo",
+                                # headers = response.data['headers'],
+                                args={'lua_source': self.render_js},
+                                callback=self.parse_comment)
 
     def parse_comment(self, response):
         self.pbar.update()
         user_comments = response.xpath(self.xpath_comment_section['user_comments'])
-        print(user_comments)
+        # print(response.xpath('//div[@class="info"]//div[@class="name"]//text()').extract_first().strip())
+
+        # Parse next comment page
+        next_selector = response.xpath(self.xpath_rules['next_comment_section'] + '/@href')
+        for url in next_selector.extract():
+            yield SplashRequest(urljoin('https://www.16personalities.com/', url),
+                                endpoint='execute',
+                                session_id="foo",
+                                # headers = response.data['headers'],
+                                args={'lua_source': self.render_js},
+                                callback=self.parse_comment)
+
         # Loop over the comment list
         for element in user_comments:
             loader = ItemLoader(item=PersonaliticsItem())
@@ -58,7 +112,6 @@ class SixteenPSpider(CrawlSpider, SixteenpXpath, scrapy.spiders.crawl):
             loader.add_value('spider', self.name)
             loader.add_value('server', socket.gethostname())
             loader.add_value('created_at', datetime.datetime.now())
-            print( loader.load_item())
             yield loader.load_item()
 
     # Source https://github.com/scrapy-plugins/scrapy-splash/issues/92
@@ -80,9 +133,11 @@ class SixteenPSpider(CrawlSpider, SixteenpXpath, scrapy.spiders.crawl):
     
     def use_splash(self, request):
         request.meta.update(splash={
+            'session_id': "foo",
             'args': {
                 'wait': 1,
             },
+
             'endpoint': 'render.html',
         })
         return request

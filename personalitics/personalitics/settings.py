@@ -30,10 +30,10 @@ PROXY_LIST = 'bypass_misc/proxy_list.txt'
 
 # Download Config
 DOWNLOAD_HANDLERS = {'s3': None,}
-HTTPCACHE_ENABLED=True
+# HTTPCACHE_ENABLED=True
 CLOSESPIDER_ITEMCOUNT=0
-DOWNLOAD_DELAY=1.0
-RANDOMIZE_DOWNLOAD_DELAY=True
+# DOWNLOAD_DELAY=0
+# RANDOMIZE_DOWNLOAD_DELAY=True
 
 # Pipeline Config
 ITEM_PIPELINES = {
@@ -63,6 +63,10 @@ SPIDER_MIDDLEWARES = {
 
 DUPEFILTER_CLASS = 'scrapy_splash.SplashAwareDupeFilter'
 HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
+
+
+COOKIES_ENABLED = True
+COOKIES_DEBUG = True
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'personalitics (+http://www.yourdomain.com)'
@@ -119,7 +123,7 @@ ROBOTSTXT_OBEY = False
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
-AUTOTHROTTLE_ENABLED = True
+# AUTOTHROTTLE_ENABLED = True
 # The initial download delay
 #AUTOTHROTTLE_START_DELAY = 5
 # The maximum download delay to be set in case of high latencies

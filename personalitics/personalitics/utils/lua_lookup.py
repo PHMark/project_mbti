@@ -8,7 +8,7 @@ lua_dict['login'] = '''function main(splash, args)
     http_method=splash.args.http_method,
     body=splash.args.body,
     })
-  assert(splash:wait(0.5))
+  assert(splash:wait(1))
 
   local entries = splash:history()
   local last_response = entries[#entries].response
@@ -18,13 +18,13 @@ lua_dict['login'] = '''function main(splash, args)
   init_login_elem:click()
   assert(splash:wait(1))
   
-  email_xpath = "//*[contains(@type, 'email')]"
+  email_xpath = "//div[@class='modal-body']//*[contains(@type, 'email')]"
   email_elem = splash:evaljs('document.evaluate("' .. email_xpath .. '", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue')
   email_elem:focus()
   email_elem:send_text("dotes.master@gmail.com")
-  assert(splash:wait(0.5))
+  assert(splash:wait(1))
   
-  passw_xpath = "//*[contains(@type, 'password')]"
+  passw_xpath = "//div[@class='modal-body']//*[contains(@type, 'password')]"
   passw_elem = splash:evaljs('document.evaluate("' .. passw_xpath .. '", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue')
   passw_elem:focus()
   passw_elem:send_text("petmalulodi001")
@@ -33,7 +33,7 @@ lua_dict['login'] = '''function main(splash, args)
   login_xpath = "//button[contains(., 'Log In') and following-sibling::a]"
   login_elem = splash:evaljs('document.evaluate("' .. login_xpath .. '", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue')
   login_elem:click()
-  assert(splash:wait(4))
+  assert(splash:wait(10))
   
   return {
     url = splash:url(),
@@ -53,7 +53,7 @@ lua_dict['render_js'] = '''function main(splash, args)
     http_method=splash.args.http_method,
     body=splash.args.body,
     })
-  assert(splash:wait(0.5))
+  assert(splash:wait(1.5))
   local entries = splash:history()
   local last_response = entries[#entries].response
 

@@ -22,3 +22,19 @@ class PersonaliticsItem(scrapy.Item):
 	created_at = Field(output_processor=TakeFirst())
 
 
+class PersonaliticsDiscussionItem(scrapy.Item):
+	# Main fields
+	topic_title = Field()
+	topic_user = Field()
+	topic_post = Field()
+	url = Field()
+	id = Field()
+	comment_list = Field()
+
+	# Housekeeping fields
+	project = Field()
+	spider = Field()
+	server = Field()
+	created_at = Field(output_processor=TakeFirst())
+
+

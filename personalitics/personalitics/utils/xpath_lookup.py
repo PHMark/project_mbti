@@ -24,7 +24,23 @@ class SixteenpXpath:
 	'date': './/div[@class="date"]//span/@title'
 	}
 
+
+class SixteenDiscussionXpath:
+	XPATHS = {}
+	XPATHS['rules'] = { 'discussions': '//a[contains(@class, "discussions")]/@href',
+	# if category
+	'categories': '//div[contains(@class, "category")]//div[@class="title"]/a/@href',
+
+	# else 
+	'subcategories': '//div[contains(@class, "category")]//div[@class="subcategories"]/a',
+
+	'threads': '//div[contains(@class, "thread")]//a',
+
+	'parse_content': '//div[@class="content"]',
 	
+	# While active_page: go to url.com/active_page active_page -= 1
+	'active_page': '//div[@class="container"]/ul[@class="pagination"]/li[contains(@class, "active")]//text()'
+	}
 
 class PersonalityCafeXpath:
 	''' Rules Loop:

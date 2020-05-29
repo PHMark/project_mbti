@@ -32,8 +32,8 @@ PROXY_LIST = 'bypass_misc/proxy_list.txt'
 DOWNLOAD_HANDLERS = {'s3': None,}
 # HTTPCACHE_ENABLED=True
 CLOSESPIDER_ITEMCOUNT=0
-# DOWNLOAD_DELAY=0
-# RANDOMIZE_DOWNLOAD_DELAY=True
+DOWNLOAD_DELAY=1
+RANDOMIZE_DOWNLOAD_DELAY=True
 
 # Pipeline Config
 ITEM_PIPELINES = {
@@ -51,7 +51,6 @@ DOWNLOADER_MIDDLEWARES = {
     'scrapy_splash.SplashCookiesMiddleware': 723,
     'scrapy_splash.SplashMiddleware': 725,
     'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
-    'personalitics.middlewares.splash.SplashMiddleware': 155
 }
 
 SPLASH_URL = 'http://192.168.99.100:8050/'
@@ -125,9 +124,9 @@ ROBOTSTXT_OBEY = False
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
 # AUTOTHROTTLE_ENABLED = True
 # The initial download delay
-#AUTOTHROTTLE_START_DELAY = 5
+# AUTOTHROTTLE_START_DELAY = 5
 # The maximum download delay to be set in case of high latencies
-#AUTOTHROTTLE_MAX_DELAY = 60
+# AUTOTHROTTLE_MAX_DELAY = 15
 # The average number of requests Scrapy should be sending in parallel to
 # each remote server
 #AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0

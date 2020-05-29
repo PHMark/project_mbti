@@ -82,7 +82,7 @@ class SixteenPSpider(CrawlSpider, SixteenpXpath):
     def parse_comment(self, response):
         self.pbar.update()
         user_comments = response.xpath(self.xpath_comment_section['user_comments'])
-        # print(response.xpath('//div[@class="info"]//div[@class="name"]//text()').extract_first().strip())
+        print(response.xpath('//div[@class="info"]//div[@class="name"]//text()').extract_first().strip())
 
         # Parse next comment page
         next_selector = response.xpath(self.xpath_rules['next_comment_section'] + '/@href')

@@ -27,19 +27,27 @@ class SixteenpXpath:
 
 class SixteenDiscussionXpath:
 	XPATHS = {}
+	XPATHS['logged_in_user'] = '//div[@class="info"]//div[@class="name"]//text()'
 	XPATHS['rules'] = { 'discussions': '//a[contains(@class, "discussions")]/@href',
-	# if category
-	'categories': '//div[contains(@class, "category")]//div[@class="title"]/a/@href',
-
-	# else 
-	'subcategories': '//div[contains(@class, "category")]//div[@class="subcategories"]/a',
-
-	'threads': '//div[contains(@class, "thread")]//a',
-
+	'categories': '//div[contains(@class, "category")]',
+	'subcategory': './/div[@class="title"]/a/@href',
+	'subcategories': './/div[@class="subcategories"]//a/@href',
+	'threads': '//div[contains(@class, "thread")]//a/@href',
+	'thread_last_page': '//a[@class="page-link"]/text()',
+	'comments_last_page': '//li[@class="active"]//text()',
 	'parse_content': '//div[@class="content"]',
-	
-	# While active_page: go to url.com/active_page active_page -= 1
 	'active_page': '//div[@class="container"]/ul[@class="pagination"]/li[contains(@class, "active")]//text()'
+	}
+
+	XPATHS['topic_user'] = {'user_type': '//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "type")]//text()',
+	'user_name': '//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "name")]//text()',
+	'avatar': '//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "avatar")]//img/@src'
+	}
+
+	XPATHS['topic'] = {'topic_title': '//section[@class="heading"]//span/text()',
+	'topic_post': '//section[contains(@class, "meta")]//div[contains(@class, "content")]//div[@class="body"]//text()',
+	'posted_time_text': '//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "time")]//text()',
+	'posted_datetime': '//section[contains(@class, "meta")]//div[@class="content"]//div[contains(@class, "time")]//@title'
 	}
 
 class PersonalityCafeXpath:

@@ -15,7 +15,7 @@ SPIDER_MODULES = ['personalitics.spiders']
 NEWSPIDER_MODULE = 'personalitics.spiders'
 
 # Log Config
-LOG_LEVEL = 'INFO' 
+LOG_LEVEL = 'DEBUG' 
 # LOG_FORMAT = '%(levelname)s: %(message)s'
 # LOG_FILE = 'log.txt'
 

@@ -4,43 +4,35 @@ import time
 import json
 import datetime
 import socket
-import requests
-import re
 from urllib.parse import urljoin
 
 from personalitics.items import PersonaliticsDiscussionItem
-from personalitics.utils import get_topic
-from personalitics.utils.xpath_lookup import SixteenpXpath
+from personalitics.utils.sixteen_p import SixteenDiscussionContent
+from personalitics.utils.xpath_lookup import SixteenDiscussionXpath
 from personalitics.utils.lua_lookup import lua_dict
 
-import scrapy
-from scrapy.linkextractors import LinkExtractor
-from scrapy.spiders import CrawlSpider, Rule
+from scrapy.spiders import CrawlSpider
 from scrapy.loader import ItemLoader
-from scrapy.loader.processors import MapCompose, TakeFirst
 from scrapy.http import HtmlResponse
-from scrapy.http import FormRequest, Request
-from scrapy.utils.python import to_bytes
-from scrapy.signalmanager import SignalManager
 from scrapy import signals
-from scrapy_splash import SplashRequest, SplashJsonResponse
-from scrapy_splash import SplashTextResponse
+from scrapy_splash import SplashRequest, SplashJsonResponse, SplashTextResponse
 
-from selenium import webdriver
 from tqdm import tqdm
 import numpy as np
 
 
-class SixteenPDiscussionSpider(CrawlSpider, SixteenpXpath):
+class SixteenPDiscussionSpider(CrawlSpider):
     name = 'sixteen_p_discussion'
     allowed_domains = ['16personalities.com']
     start_urls = ['https://www.16personalities.com/community']
-
-    xpath_rules = SixteenpXpath.XPATHS['rules']
-    xpath_comment_section = SixteenpXpath.XPATHS['comment_section']
+    xpath_rules = SixteenDiscussionXpath.XPATHS['rules']
+    xpath_logged_in_user = SixteenDiscussionXpath.XPATHS['logged_in_user']
     render_js = lua_dict['render_js']
 
     def start_requests(self):
+        '''Start the very first request by logging in to the page
+           then go to the after_login function'''
+
         lua_script = lua_dict['login']
         print('Logging in ....')
         yield SplashRequest(
@@ -53,27 +45,34 @@ class SixteenPDiscussionSpider(CrawlSpider, SixteenpXpath):
             )
     
     def after_login(self, response):
-        print('Logged in as: ', response.xpath('//div[@class="info"]//div[@class="name"]//text()').extract_first().strip())
-        discussion = response.xpath('//a[contains(@class, "discussions")]/@href').extract_first()
-        yield SplashRequest(urljoin(response.url, discussion),
+        '''A function that is called after logging in to the page.
+           This redirects the login page to the discussion page'''
+
+        print('Logged in as: ', response.xpath(self.xpath_logged_in_user).extract_first().strip())
+        discussions = response.xpath(self.xpath_rules['discussions']).extract_first()
+        yield SplashRequest(urljoin(response.url, discussions),
                             endpoint='execute',
                             session_id="foo",
                             args={'wait': 1.5, 'lua_source': self.render_js},
                             callback=self.parse_category)
 
     def parse_category(self, response):
-        categories = response.xpath('//div[contains(@class, "category")]')
+        '''Parse the category & subcategory links in the discussion page'''
 
+        categories = response.xpath(self.xpath_rules['categories'])
         for url in categories:
-            subcategories = url.xpath('.//div[@class="subcategories"]//a/@href')
+            subcategories = url.xpath(self.xpath_rules['subcategories'])
+
+            # If the current category has no subcategory
             if not subcategories:
-                subcat_url = url.xpath('.//div[@class="title"]/a/@href').extract_first()
+                subcat_url = url.xpath(self.xpath_rules['subcategory']).extract_first()
                 yield SplashRequest(urljoin(response.url, subcat_url),
                                     endpoint='execute',
                                     session_id="foo",
                                     args={'wait': 1, 'lua_source': self.render_js},
                                     callback=self.parse_thread_pagination)
 
+            # If the current category has a subcategory
             else:
                 for subcat_url in subcategories.extract():
                     yield SplashRequest(urljoin(response.url, subcat_url),
@@ -82,10 +81,11 @@ class SixteenPDiscussionSpider(CrawlSpider, SixteenpXpath):
                                         args={'wait': 1, 'lua_source': self.render_js},
                                         callback=self.parse_thread_pagination)
 
-    # 1.) Go to page x
     def parse_thread_pagination(self, response):
-        last_page = response.xpath('//a[@class="page-link"]/text()')[-2].get()
-        for i in range(1, int(last_page)):
+        '''Parse all the Thread links from Page i to the Last Page'''
+
+        thread_last_page = response.xpath(self.xpath_rules['thread_last_page'])[-2].get()
+        for i in range(1, int(thread_last_page)+1):
             current_page_url = urljoin(response.url, '?&page='+str(i))
             yield SplashRequest(current_page_url,
                                 endpoint='execute',
@@ -94,7 +94,10 @@ class SixteenPDiscussionSpider(CrawlSpider, SixteenpXpath):
                                 callback=self.parse_thread)
 
     def parse_thread(self, response):
-        threads = response.xpath('//div[contains(@class, "thread")]//a/@href')
+        '''A function that is called by parse_thread_pagination function.
+           This function will visit a Thread'''
+
+        threads = response.xpath(self.xpath_rules['threads'])
         print(response.url)
         for thread in threads.extract():
             yield SplashRequest(urljoin(response.url, thread),
@@ -104,144 +107,76 @@ class SixteenPDiscussionSpider(CrawlSpider, SixteenpXpath):
                                         callback=self.parse_content)
 
     def parse_content(self, response):
-        self.pbar.update()
-        
-        ls = response.meta['splash']['args']['cookies']
-        cookies = '; '.join([l['name'] + '=' + l['value'] for l in ls])
-        last_page = response.xpath('//li[@class="active"]//text()').extract_first()
+        '''Parse the content of the current Thread, from Page i to the Last Page'''
 
+        self.pbar.update()
+        ls_cookies = response.meta['splash']['args']['cookies']
+        cookies = '; '.join([l['name'] + '=' + l['value'] for l in ls_cookies])
+        last_page = response.xpath(self.xpath_rules['comments_last_page']).extract_first()
+
+        # If Multi Pager
         if last_page and '{{' not in last_page:
             for i in range(1, int(last_page)+1):
+                print("[Last Page: {}]".format(last_page))
                 loader = ItemLoader(item=PersonaliticsDiscussionItem())
-                user_type = response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "type")]//text()').extract_first()
-                if user_type:
-                    user_type = user_type.strip()
-                 # 1.) Get topic title & topic post
-                topic_title = response.xpath('//section[@class="heading"]//span/text()').extract_first()
-                topic_user = {'avatar': response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "avatar")]//img/@src').extract_first(),
-                'user_name': response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "name")]//text()').extract_first(),
-                'user_type': user_type,
-                'posted_time_text': response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "time")]//text()').extract_first(),
-                'posted_datetime': response.xpath('//section[contains(@class, "meta")]//div[@class="content"]//div[contains(@class, "time")]//@title').extract_first()
-                }
-                topic_post = response.xpath('//section[contains(@class, "meta")]//div[contains(@class, "content")]//div[@class="body"]//text()').extract()
+
+                discussion_content = SixteenDiscussionContent(response, cookies, i)
+
+                # 1.) Get the content of the topic
+                topic_user_type, topic_title, topic_post, topic_user = discussion_content.get_topic_content_values()
                 
-                # Housekeeping fields
+                # 2.) Get the comments json on the Current Page
+                comments = discussion_content.get_comments_json()
+
+                # 3.) Load the page items
+                #
+                # 3.1.) Housekeeping fields
                 loader.add_value('project', self.settings.get('BOT_NAME'))
                 loader.add_value('spider', self.name)
                 loader.add_value('server', socket.gethostname())
                 loader.add_value('created_at', datetime.datetime.now())
 
-                # Primary fields
+                # 3.2.) Primary fields
                 loader.add_value('topic_title', topic_title)
                 loader.add_value('topic_user', json.dumps(topic_user))
                 loader.add_value('topic_post', ' '.join(topic_post))
-
-                current_page_url = urljoin(response.url, '?page='+str(i))
-                print("Multi Pager Current URL: [Last Page: {}] {}".format(last_page, current_page_url))
-                loader.add_value('url', current_page_url)
-
-                # 1.1.) Get id
-                id = re.findall(r'/([\d]+)/', current_page_url)[0]
-                loader.add_value('id', id)
-
-                # 1.2.) Get page
-                page = i
-
-                # 1.3.) Get comments
-                comments = self.get_comments(id, page, cookies)
-
                 loader.add_value('comment_list', comments)
-                time.sleep(np.random.uniform(0.75, 1.5))
+                loader.add_value('url', discussion_content.current_page_url)
+                loader.add_value('id', discussion_content.get_post_id())
+
+                time.sleep(np.random.uniform(0.75, 1.25))
                 yield loader.load_item()
 
+        # If One Pager
         else:
             loader = ItemLoader(item=PersonaliticsDiscussionItem())
-            user_type = response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "type")]//text()').extract_first()
-            if user_type:
-                user_type = user_type.strip()
-             # 1.) Get topic title & topic post
-            topic_title = response.xpath('//section[@class="heading"]//span/text()').extract_first()
-            topic_user = {'avatar': response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "avatar")]//img/@src').extract_first(),
-            'user_name': response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "name")]//text()').extract_first(),
-            'user_type': user_type,
-            'posted_time_text': response.xpath('//section[contains(@class, "meta")]//div[@class="poster"]//div[contains(@class, "time")]//text()').extract_first(),
-            'posted_datetime': response.xpath('//section[contains(@class, "meta")]//div[@class="content"]//div[contains(@class, "time")]//@title').extract_first()
-            }
-            topic_post = response.xpath('//section[contains(@class, "meta")]//div[contains(@class, "content")]//div[@class="body"]//text()').extract()
+
+            discussion_content = SixteenDiscussionContent(response, cookies, 1)
+
+            # 1.) Get the content of the topic
+            topic_user_type, topic_title, topic_post, topic_user = discussion_content.get_topic_content_values()
             
-            # Housekeeping fields
+            # 2.) Get the comments json on the Current Page
+            comments = discussion_content.get_comments_json()
+
+             # 3.) Load the page items
+
+            # 3.1.) Housekeeping fields
             loader.add_value('project', self.settings.get('BOT_NAME'))
             loader.add_value('spider', self.name)
             loader.add_value('server', socket.gethostname())
             loader.add_value('created_at', datetime.datetime.now())
 
-            # Primary fields
+            # 3.2.) Primary fields
             loader.add_value('topic_title', topic_title)
             loader.add_value('topic_user', json.dumps(topic_user))
             loader.add_value('topic_post', ' '.join(topic_post))
-
-            # One pager
-            current_page_url = response.url
-            print("One Pager Current URL: {}".format(current_page_url))
-            loader.add_value('url', current_page_url)
-
-            # 1.1.) Get id
-            id = re.findall(r'/([\d]+)/', current_page_url)[0]
-            loader.add_value('id', id)
-
-            # 1.2.) Get page
-            page = 1
-
-            # 1.3.) Get comments
-            comments = self.get_comments(id, page, cookies)
             loader.add_value('comment_list', comments)
-            time.sleep(np.random.uniform(0.75, 1.25))
+            loader.add_value('url', discussion_content.current_page_url)
+            loader.add_value('id', discussion_content.get_post_id())
+            
+            time.sleep(np.random.uniform(0.5, 1))
             yield loader.load_item()
-
-    def get_comments(self, id, page, cookies):
-        headers = {'content-type': 'application/json',
-                   'accept': 'application/json, text/plain, */*',
-                   'cookie': cookies
-        }   
-        url = 'https://www.16personalities.com/community/discussions/comments/retrieve'
-        success = False
-        while not success:
-            try:
-                r = requests.post(url=url, headers=headers, data=json.dumps({"page": int(page), "id": int(id)}))
-                success = True
-            except:
-                print('[REQUEST FAILED]: Retrying to send a new request.')
-                success = False
-        return json.dumps(r.json())
-
-    # Source https://github.com/scrapy-plugins/scrapy-splash/issues/92
-    def _requests_to_follow(self, response):
-        if not isinstance(
-                response,
-                (HtmlResponse, SplashJsonResponse, SplashTextResponse)):
-            return
-        seen = set()
-        for n, rule in enumerate(self._rules):
-            links = [lnk for lnk in rule.link_extractor.extract_links(response)
-                     if lnk not in seen]
-            if links and rule.process_links:
-                links = rule.process_links(links)
-            for link in links:
-                seen.add(link)
-                r = self._build_request(n, link)
-                yield rule.process_request(r)
-    
-    def use_splash(self, request):
-        request.meta.update(splash={
-            'session_id': "foo",
-            'args': {
-                'wait': 0.5,
-            },
-
-            'endpoint': 'render.html',
-        })
-        return request
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):

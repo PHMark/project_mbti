@@ -11,15 +11,16 @@ def unpack_topic_user(topic_user):
     x = json.loads(topic_user['topic_user'])
     x = pd.DataFrame([x])
     x['url'] = topic_user['url']
+    print(type(x))
     return x
 
-def unpack_subcomments(comment_list):
+def unpack_comments(comment_list):
     comments = json.loads(comment_list['comment_list'])['comments']
     comments = pd.DataFrame.from_dict(comments)
     comments['url'] = comment_list['url']
     return comments
 
-def unpack_subcomment_user(sub_user):
+def unpack_comment_user(sub_user):
     user = sub_user['user']
     user = pd.DataFrame.from_dict([user])
     user['id'] = sub_user['id']
@@ -39,7 +40,4 @@ def parse_type_16personality(string):
     return type_[0] if type_ else string
     
 def html_to_text(html):
-    soup = BeautifulSoup(html.strip())
-    return soup.get_text().strip()
-
-
+    return re.sub('<.+?>', ' ', html).strip()

@@ -1,5 +1,4 @@
 venv/
-output/
 __pycache__/
 crawls/
 .ipynb_checkpoints/
